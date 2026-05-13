@@ -1,0 +1,706 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+  <title>Vision HUD</title>
+
+
+
+  <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
+
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+
+
+  <style>
+
+    body {
+
+      margin: 0;
+
+      overflow: hidden;
+
+      background: #020202;
+
+      font-family: monospace;
+
+    }
+
+
+
+    #camera {
+
+      position: absolute;
+
+      top: 80px;
+
+      left: 20px;
+
+      border: 1px solid #00ffcc;
+
+      opacity: 0.4;
+
+      box-shadow: 0 0 15px #00ffcc;
+
+      display: none;
+
+    }
+
+
+
+    #scanLine {
+
+      position: absolute;
+
+      width: 300px;
+
+      height: 2px;
+
+      background: #00ffcc;
+
+      top: 80px;
+
+      left: 20px;
+
+      animation: scan 2s infinite;
+
+      box-shadow: 0 0 10px #00ffcc;
+
+      display: none;
+
+    }
+
+    .blurText {
+      filter: blur(6px);
+      opacity: 0.6;
+    }
+
+  /* 🚨 BLOQUEIO PISCANDO */
+body.bloqueio a-scene {
+  animation: alertaVermelho 0.2s infinite;
+}
+
+@keyframes alertaVermelho {
+  0%   { filter: brightness(1); }
+  50%  { filter: brightness(0.3) sepia(1) hue-rotate(-50deg) saturate(8); }
+  100% { filter: brightness(1); }
+}
+
+/* HUD vermelho piscando */
+body.bloqueio #statusHUD,
+body.bloqueio #subStatusHUD {
+  color: red !important;
+  text-shadow: 0 0 10px red, 0 0 25px red;
+}
+
+@keyframes glitchRed {
+  0% { filter: hue-rotate(0deg) brightness(1); }
+  50% { filter: hue-rotate(-50deg) brightness(0.7); }
+  100% { filter: hue-rotate(0deg) brightness(1); }
+}
+
+
+    @keyframes scan {
+
+      0% { transform: translateY(0); }
+
+      100% { transform: translateY(200px); }
+
+    }
+
+  </style>
+
+</head>
+
+
+
+<body>
+
+
+
+<a-scene background="color: #020202">
+  <a-assets>
+  <video id="officeVideo"
+         src="https://cdn.coverr.co/videos/coverr-working-in-modern-office-5176/1080p.mp4"
+         autoplay
+         loop
+         muted
+         crossorigin="anonymous"
+         playsinline
+         webkit-playsinline>
+  </video>
+</a-assets>
+
+<a-videosphere id="videoSphere"
+               src="#officeVideo"
+               rotation="0 -90 0"
+               opacity="0">
+</a-videosphere>
+
+
+
+  <!-- CAMERA -->
+
+  <a-entity camera look-controls position="0 1.6 0"></a-entity>
+
+
+
+  <!-- GRID -->
+
+  <a-plane rotation="-90 0 0" width="20" height="20"
+
+           material="wireframe: true; color: #0aff9d; opacity: 0.1">
+
+  </a-plane>
+
+
+
+  <!-- HUD CENTRAL (BAIXO PRA NÃO PEGAR TEXTO) -->
+
+  <a-entity position="0 1.25 -2">
+
+
+
+    <a-ring id="ring"
+
+            radius-inner="0.25"
+
+            radius-outer="0.27"
+
+            color="#00ffcc"
+
+            animation="property: rotation; to: 0 0 360; loop: true; dur: 8000">
+
+    </a-ring>
+
+
+
+    <a-circle radius="0.02" color="#00ffcc"></a-circle>
+
+
+
+  </a-entity>
+
+
+
+  <!-- LINHA SUPERIOR -->
+
+  <a-plane position="0 2.55 -2" width="2" height="0.005"
+
+           color="#00ffcc" opacity="0.4">
+
+  </a-plane>
+
+
+
+  <!-- TÍTULO -->
+
+  <a-text value="VISION SYSTEM"
+
+          position="0 2.3 -2"
+
+          align="center"
+
+          color="#00ffcc"
+
+          scale="1.2 1.2 1.2">
+
+  </a-text>
+
+
+
+  <!-- STATUS -->
+
+  <a-text id="statusHUD"
+
+          value="INICIALIZANDO..."
+
+          position="0 2.0 -2"
+
+          align="center"
+
+          color="#00ff88"
+
+          scale="0.9 0.9 0.9">
+
+  </a-text>
+
+
+
+  <!-- SUBSTATUS -->
+
+  <a-text id="subStatusHUD"
+
+          value=""
+
+          position="0 1.75 -2"
+
+          align="center"
+
+          color="#00ffaa"
+
+          scale="0.8 0.8 0.8">
+
+  </a-text>
+
+
+
+  <!-- CÓDIGO -->
+
+  <a-text 
+        id="codeHUD"
+        value=""
+        position="0 1.0 -1"
+        align="center"
+        color="#00ffcc"
+        scale="0.8 0.8 0.8">
+
+  </a-text> 
+
+<a-text 
+  id="modeHUD"
+  value="MODE: ON"
+  position="1.2 2.4 -2"
+  align="right"
+  color="#00ffcc"
+  scale="0.5 0.5 0.5"
+  click-toggle>
+</a-text>
+
+  <!-- LINHA INFERIOR -->
+
+  <a-plane position="0 0.7 -2" width="2" height="0.005"
+
+           color="#00ffcc" opacity="0.2">
+
+  </a-plane>
+
+
+
+</a-scene>
+
+
+
+<!-- CAMERA -->
+
+<video id="camera" width="300" height="200" autoplay></video>
+
+<div id="scanLine"></div>
+
+
+
+<script>
+
+// ================= CONFIG =================
+let modo = "ON";
+let iaAtiva = false;
+
+// ================= CLICK MODE =================
+document.addEventListener("keydown", function(e) {
+  if (e.code === "Space") {
+    e.preventDefault();
+
+    modo = (modo === "ON") ? "LOCK" : "ON";
+
+    $("#modeHUD").attr("value", "MODE: " + modo);
+
+    $("#subStatusHUD").attr("value",
+      modo === "ON" ? "MODO NORMAL" : "ACESSO BLOQUEADO, CREDENCIAL NECESSARIA");
+
+    glowSuccess();
+  }
+});
+
+// ================= FUNÇÕES =================
+function gerarCodigo() {
+  return Math.floor(100000 + Math.random() * 900000);
+}
+
+function glowSuccess() {
+  $("#ring").attr("animation",
+    "property: scale; to: 1.3 1.3 1.3; dir: alternate; loop: 4; dur: 300");
+}
+
+// ================= SISTEMA =================
+function iniciarSistema() {
+
+  // ETAPA 1
+  $("#statusHUD").attr("value", "ESCANEANDO QR CODE...");
+  if (!iaAtiva) {
+    $("#subStatusHUD").attr("value", "POSICIONE O CODIGO");
+  }
+
+  navigator.mediaDevices.getUserMedia({ video: true })
+    .then(stream => {
+      $("#camera")[0].srcObject = stream;
+      $("#camera").show();
+      $("#scanLine").show();
+    })
+    .catch(() => {
+      $("#statusHUD").attr("value", "ERRO CAMERA");
+      $("#subStatusHUD").attr("value", "PERMISSÃO NEGADA");
+    });
+
+  // QR OK
+  setTimeout(() => {
+    $("#statusHUD").attr("value", "QR CODE VALIDADO");
+    if (!iaAtiva) {
+      $("#subStatusHUD").attr("value", "IDENTIDADE CAPTURADA");
+    }
+    glowSuccess();
+  }, 5000);
+
+  // ETAPA 2
+  setTimeout(() => {
+    if (!iaAtiva) {
+      $("#statusHUD").attr("value", "📡 ENVIANDO TOKEN...");
+      $("#subStatusHUD").attr("value", "DISPOSITIVO MOVEL");
+    }
+  }, 9000);
+
+  // ETAPA 3
+  setTimeout(() => {
+    if (!iaAtiva) {
+      $("#statusHUD").attr("value", "📱 FACE ID REQUERIDO");
+      $("#subStatusHUD").attr("value", "CONFIRME NO CELULAR");
+    }
+  }, 13000);
+
+  setTimeout(() => {
+    if (!iaAtiva) {
+      $("#statusHUD").attr("value", "✅ FACE ID VALIDADO");
+      $("#subStatusHUD").attr("value", "AUTENTICAÇÃO FORTE");
+      glowSuccess();
+    }
+  }, 17000);
+
+  // ETAPA 4 (CORRIGIDO)
+  setTimeout(() => {
+    if (!iaAtiva) {
+      let codigo = gerarCodigo();
+      $("#statusHUD").attr("value", "🔐 TOKEN CONFIRMADO");
+      $("#subStatusHUD").attr("value", "SINCRONIZAÇÃO SEGURA");
+      $("#codeHUD").attr("value", "TOKEN: " + codigo);
+    }
+  }, 21000);
+
+  // ETAPA 5
+  setTimeout(() => {
+    if (!iaAtiva) {
+      $("#statusHUD").attr("value", "📍 VERIFICANDO LOCALIZAÇÃO...");
+      $("#subStatusHUD").attr("value", "ANALISANDO AMBIENTE");
+      $("#codeHUD").attr("value", "");
+    }
+  }, 26000);
+
+  setTimeout(() => {
+    if (!iaAtiva) {
+      $("#statusHUD").attr("value", "🟢 ZONA SEGURA CONFIRMADA");
+      $("#subStatusHUD").attr("value", "ACESSO AUTORIZADO");
+      glowSuccess();
+    }
+  }, 31000);
+
+  // FINAL LIMPO (SEM DUPLICAÇÃO)
+  setTimeout(() => {
+
+    $("#statusHUD").attr("value", "ACESSO LIBERADO");
+    $("#subStatusHUD").attr("value", "IA ONLINE - AGUARDANDO COMANDO");
+
+      if (!iaAtiva) {
+        iaAtiva = true;
+        iniciarIA();
+      }
+
+    glowSuccess();
+
+    let video = document.querySelector("#officeVideo");
+    video.play();
+
+    let sphere = document.querySelector("#videoSphere");
+    sphere.setAttribute("animation", {
+      property: "opacity",
+      to: 1,
+      dur: 4000,
+      easing: "easeInOutQuad"
+    });
+
+  }, 36000);
+}
+
+// ================= IA =================
+let recognition = null;
+
+  
+// 🔥 PERMISSÃO DE MICROFONE
+
+async function ativarMicrofone() {
+  try {
+    await navigator.mediaDevices.getUserMedia({ audio: true });
+    console.log("🎤 Permissão de microfone concedida");
+    return true;
+  } catch (e) {
+    console.log("❌ Permissão negada:", e);
+    $("#subStatusHUD").attr("value", "MIC BLOQUEADO");
+    return false;
+  }
+}
+
+
+// 🚨 EFEITO VISUAL DE BLOQUEIO
+function ativarBloqueioVisual() {
+
+  $("body").addClass("bloqueio");
+
+  $("#statusHUD").attr("value", "⚠️ ACESSO NEGADO");
+  $("#subStatusHUD").attr("value", "DADO SENSIVEL BLOQUEADO");
+
+  glowSuccess();
+
+  setTimeout(() => {
+    $("body").removeClass("bloqueio");
+
+    $("#statusHUD").attr("value", "ACESSO LIBERADO");
+    $("#subStatusHUD").attr("value", "IA ONLINE - AGUARDANDO COMANDO");
+
+  }, 2000); // ⏱️ 2 segundos
+}
+
+
+let iaRodando = false;
+let podeReiniciar = true;
+
+
+//=============== CEREBRO DA IA (OTIMIZADO PARA VISOR) ===================
+let baseDados = {
+  // --- MONITORAMENTO GERAL ---
+  "sistema|systema|cistema|zistema": "Bateria do sistema em 100%. Protocolos de seguranca ativos.",
+  "refinaria|refino": "Refinarias operando em 78% da capacidade nominal. Sem gargalos detectados.",
+  "exploracao|perfuracao": "Sonda de perfuracao em modo de espera; aguardando liberacao de acesso ao poco.",
+  "producao|vazao|fluxo": "Producao atual: 5.646 barris/dia. Estabilidade de fluxo confirmada.",
+  "unidade|plataforma|fpso": "Unidade operando dentro dos limites de inclinacao e estabilidade.",
+  
+  // --- SEGURANCA E AMBIENTE (HSE) ---
+  "seguranca|epi|epc": "Verifique o uso de capacete, luvas de impacto e detector de H2S antes de entrar na area.",
+  "vazamento|contencao|derramamento": "Nenhum alerta de vazamento nas ultimas 24 horas. Sensores de pressao estaveis.",
+  "incendio|fogo|brigada": "Sistema fixo de combate a incendio em prontidao. Saidas de emergencia desobstruidas.",
+  "pressao|manometro|psi": "Pressao do cabecote do poco operando dentro da margem de 1500 a 2000 psi.",
+  "gas|h2s|metano": "Detectores de gas ativos. Concentracao de gases inflamaveis em 0%.",
+
+  // --- EQUIPAMENTOS E MANUTENCAO ---
+  "bomba|motobomba|compressor": "Compressor de gas 02 com manutencao preventiva agendada para 48 horas.",
+  "valvula|anular|gaveta|dhsv": "Valvula de seguranca de fundo (DHSV) testada e operacional.",
+  "turbina|gerador|energia": "Gerador de energia operando em carga media. Consumo de diesel regular.",
+  "instrumentacao|calibracao": "Sensores de nivel calibrados na ultima parada de manutencao.",
+  "lubrificacao|oleo|graxa": "Niveis de lubrificante dos motores verificados e conformes.",
+
+  // --- LOGISTICA E FLUIDOS ---
+  "lama|fluido|viscosidade": "Viscosidade do fluido de perfuracao dentro dos parametros de projeto (50-60 marsh).",
+  "estoque|tanque|armazenamento": "Tanque de armazenamento T-402 em 65% da capacidade total.",
+  "logistica|transporte|offshore": "Previsao de chegada da embarcacao de suprimentos: 14:00h.",
+  "carga|suprimento|diesel": "Estoque de combustivel suficiente para 15 dias de operacao plena.",
+
+  // --- EQUIPAMENTOS DE FLUXO E CONTROLE ---
+  "tubo|linha|duto|tubulacao": "Integridade da linha confirmada. Sem sinais de corrosao externa.",
+  "filtro|peneira": "Diferencial de pressao no filtro esta normal. Sem necessidade de troca.",
+  "selo|gaxeta|vedacao": "Selo mecanico operando sem gotejamento. Temperatura estavel.",
+  "flange|junta|torque": "Torque verificado conforme norma. Sem perda de estanqueidade.",
+  
+  // --- MOTORES E ELETRICA ---
+  "motor|arranque|rotacao": "Motor principal com vibracao em 2.5 mm/s. Dentro da zona verde.",
+  "painel|disjuntor|tensao": "Painel eletrico refrigerado e sem alarmes de sobrecarga.",
+  "cabo|fiacao|isolamento": "Isolamento testado. Resistencia dentro dos padroes de seguranca.",
+  "bateria|nobreak|ups": "Autonomia de bateria em 4 horas para sistemas criticos.",
+
+  // --- FERRAMENTAS E SENSORES ---
+  "camera|termica|calor": "Anomalias termicas detectadas no flange primario. Favor inspecionar.",
+  "medidor|sensor|radar": "Sensor de nivel ultrassonico ativo. Margem de erro de 0.1%.",
+  "chave|ferramenta": "Torquimetro calibrado e disponivel na bancada de ferramentas.",
+  "radio|comunicacao|sinal": "Sinal de radio forte em todas as areas da unidade.",
+
+  // --- ESTRUTURA E ACESSO ---
+  "andaime|escada|passarela": "Estrutura de acesso inspecionada e liberada para uso (etiqueta verde).",
+  "guindaste|guincho|içamento": "Capacidade de carga limitada a 50 toneladas devido ao vento atual.",
+  "elevador|montacarga": "Elevador de servico em manutencao preventiva ate as 15:00h.",
+  "vaso|separador|vasodepressao": "Vaso de pressao operando em regime de 45 graus Celsius.",
+
+  // --- EMERGENCIA E COMANDOS RAPIDOS ---
+  "status|geral|resumo": "Todos os sistemas criticos operando em redundancia.",
+  "alerta|erro|falha": "Nenhum erro critico pendente no log do sistema.",
+  "ajuda|suporte|manual": "Protocolo de suporte ativo. Diga o nome do equipamento para detalhes.",
+  "parada|stop|desligar": "Sequencia de desligamento de emergencia (ESD) pronta para acionamento.",
+  "clima|tempo|vento": "Condicoes climaticas favoraveis para operacoes de deck.",
+  "murilo": "ele gosta de rebolar lentinho pros cria",
+  "cabelinho": "precisa de testosterona da fonte",
+
+};
+
+// 🚨 DADOS SENSÍVEIS (BLACKLIST EXPANDIDA E SEM ACENTOS)
+
+let dadosSensiveis = [
+  // --- IDENTIFICACAO PESSOAL ---
+  "cpf", "rg", "passaporte", "cnh", "biometria", "digital", "nascimento", "endereco", "sobrenome",
+
+  // --- AUTENTICACAO E ACESSO ---
+  "senha", "password", "pin", "token", "codigo", "acesso", "credencial", "login", 
+  "chave", "key", "secret", "privada", "ssh", "api", "autenticacao", "mfa", "2fa", "admin", "root",
+
+  // --- FINANCEIRO E PAGAMENTOS ---
+  "cartao", "numero do cartao", "cvv", "validade", "banco", "pix", "agencia", "conta",
+  "fatura", "pagamento", "salario", "custo", "valor", "orcamento", "financeiro", "preco",
+
+  // --- COMANDOS DE EXTRACAO ---
+  "print", "foto", "enviar", "exportar", "download", "baixar", "copiar", "printscreen",
+  "gravar","grava","grava", "audio", "video", "anexo", "upload", "compartilhar", "link", "transmitir", "backup",
+
+  // --- SEGREDOS INDUSTRIAIS ---
+  "coordenada", "latitude", "longitude", "gps", "mapa", "planta", "projeto", "estrategia",
+  "vulnerabilidade", "falha", "brecha", "exploit", "bug", "defeito", "fraqueza",
+  "quimica", "formula", "composicao", "mistura", "patente", "geologia", "reservatorio",
+
+  // --- INFRAESTRUTURA DE TI ---
+  "ip", "servidor", "host", "database", "banco de dados", "sql", "firewall", "porta", 
+  "vpn", "proxy", "endpoint", "dns", "gateway", "mac address"
+];
+//================================================================
+
+function iniciarIA() {
+
+  if (iaRodando) return;
+
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+  if (!SpeechRecognition) {
+    $("#subStatusHUD").attr("value", "IA NÃO SUPORTADA");
+    return;
+  }
+
+  recognition = new SpeechRecognition();
+
+  recognition.lang = "pt-BR";
+  recognition.continuous = true; 
+  recognition.interimResults = false;
+
+  recognition.onstart = function () {
+    iaRodando = true;
+    console.log("🎤 IA iniciou");
+  };
+
+  recognition.onend = function () {
+    iaRodando = false;
+
+    if (!iaAtiva) return;
+
+    if (!podeReiniciar) return;
+
+    podeReiniciar = false;
+
+    setTimeout(() => {
+      try {
+        recognition.start();
+      } catch (e) {
+        console.log("Erro ao reiniciar:", e);
+      }
+
+      setTimeout(() => {
+        podeReiniciar = true;
+      }, 1000);
+
+    }, 2500); // tempo maior = estabilidade total
+  };
+
+  recognition.onerror = function (event) {
+
+    console.log("Erro:", event.error);
+
+    if (event.error === "not-allowed") {
+      $("#subStatusHUD").attr("value", "MICROFONE BLOQUEADO");
+      iaAtiva = false;
+    }
+
+    if (
+      event.error === "aborted" ||
+      event.error === "network" ||
+      event.error === "service-not-allowed"
+    ) {
+      return;
+    }
+  };
+
+recognition.onresult = function (event) {
+
+  let texto = event.results[event.results.length - 1][0].transcript
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+
+  console.log("Você disse:", texto);
+
+  // 🚨 VERIFICA DADOS SENSÍVEIS
+for (let dado of dadosSensiveis) {
+  if (texto.includes(dado)) {
+    ativarBloqueioVisual();
+    return;
+  }
+}
+
+  for (let palavra in baseDados) {
+
+    let alternativas = palavra.split("|");
+
+    for (let alt of alternativas) {
+
+      if (texto.includes(alt)) {
+
+        if (modo === "ON") {
+          $("#subStatusHUD").attr("value", baseDados[palavra]);
+        } else {
+          $("#subStatusHUD").attr("value", "INFORMACAO SENSIVEL DA IA BLOQUEADA");
+        }
+
+        glowSuccess();
+        return;
+      }
+    }
+  }
+};
+
+  try {
+    recognition.start();
+  } catch (e) {
+    console.log("Erro ao iniciar:", e);
+  }
+}
+
+
+// ================= START =================
+$(document).ready(function(){
+  setTimeout(iniciarSistema, 2000);
+});
+
+let iaIniciada = false;
+
+$(document).one("click", async function(){
+
+  let permitido = await ativarMicrofone();
+
+  if (!permitido) return;
+
+  if (!iaIniciada) {
+    iaAtiva = true;
+    iniciarIA();
+    iaIniciada = true;
+
+    $("#subStatusHUD").attr("value", "IA OUVINDO...");
+  }
+});
+
+</script>
+
+
+
+</body>
+
+</html>
