@@ -77,6 +77,187 @@
       opacity: 0.6;
     }
 
+    /* ================= GUIA ================= */
+
+#guidePanel {
+
+  position: absolute;
+  right: 20px;
+  top: 20px;
+
+  width: 320px;
+
+  background: rgba(0,0,0,0.55);
+
+  border: 1px solid #00ffcc;
+
+  box-shadow:
+    0 0 15px #00ffcc,
+    inset 0 0 15px rgba(0,255,204,0.2);
+
+  padding: 18px;
+
+  color: #00ffcc;
+
+  z-index: 999;
+
+  backdrop-filter: blur(6px);
+
+  border-radius: 10px;
+
+  animation: pulseHUD 3s infinite;
+}
+
+#guidePanel h2 {
+
+  margin-top: 0;
+
+  font-size: 18px;
+
+  text-align: center;
+
+  letter-spacing: 2px;
+
+  border-bottom: 1px solid rgba(0,255,204,0.3);
+
+  padding-bottom: 10px;
+}
+
+.guideItem {
+
+  margin-top: 15px;
+}
+
+.guideItem span {
+
+  color: #00ff88;
+
+  font-weight: bold;
+
+  display: block;
+
+  margin-bottom: 5px;
+}
+
+.guideItem p {
+
+  margin: 0;
+
+  font-size: 13px;
+
+  line-height: 1.5;
+
+  color: #aaffee;
+}
+
+/* ================= HEADER GUIA ================= */
+
+#guideHeader {
+
+  display: flex;
+
+  justify-content: space-between;
+
+  align-items: center;
+
+  margin-bottom: 10px;
+
+  border-bottom: 1px solid rgba(0,255,204,0.3);
+
+  padding-bottom: 10px;
+}
+
+#guideHeader span {
+
+  color: #00ffcc;
+
+  font-size: 15px;
+
+  letter-spacing: 2px;
+
+  font-weight: bold;
+}
+
+#guideHeader button {
+
+  width: 28px;
+
+  height: 28px;
+
+  margin-left: 5px;
+
+  background: rgba(0,255,204,0.1);
+
+  border: 1px solid #00ffcc;
+
+  color: #00ffcc;
+
+  cursor: pointer;
+
+  font-size: 16px;
+
+  transition: 0.3s;
+}
+
+#guideHeader button:hover {
+
+  background: #00ffcc;
+
+  color: black;
+
+  box-shadow: 0 0 10px #00ffcc;
+}
+
+/* ================= ESTADOS ================= */
+
+.minimized {
+
+  height: 60px !important;
+
+  overflow: hidden;
+}
+
+.maximized {
+
+  width: 500px !important;
+
+  height: 90vh !important;
+
+  overflow-y: auto;
+}
+
+#guidePanel::-webkit-scrollbar {
+
+  width: 6px;
+}
+
+#guidePanel::-webkit-scrollbar-thumb {
+
+  background: #00ffcc;
+
+  box-shadow: 0 0 10px #00ffcc;
+}
+
+@keyframes pulseHUD {
+
+  0% {
+    box-shadow:
+      0 0 10px #00ffcc,
+      inset 0 0 10px rgba(0,255,204,0.1);
+  }
+
+  50% {
+    box-shadow:
+      0 0 20px #00ffcc,
+      inset 0 0 20px rgba(0,255,204,0.25);
+  }
+
+  100% {
+    box-shadow:
+      0 0 10px #00ffcc,
+      inset 0 0 10px rgba(0,255,204,0.1);
+  }
+}
 
 
     @keyframes scan {
@@ -95,7 +276,51 @@
 
 <body>
 
+<!-- ================= GUIA DO USUÁRIO ================= -->
 
+<div id="guidePanel">
+
+  <h2 id="guideTitle">GUIA OPERACIONAL</h2>
+
+   <div>
+    <button id="minimizeGuide">—</button>
+    <button id="maximizeGuide">□</button>
+  </div>
+
+  <div class="guideItem">
+    <span>🖱 CLICK</span>
+    <p>Ativa a Inteligência Artificial e o microfone.</p>
+  </div>
+
+  <div class="guideItem">
+    <span>⌨ SPACE</span>
+    <p>Alterna entre MODE: ON e MODE: LOCK.</p>
+  </div>
+
+  <div class="guideItem">
+    <span>🎤 COMANDOS DE VOZ</span>
+    <p>
+      Diga:
+      <br>• "sistema"
+      <br>• "refinaria"
+      <br>• "exploração"
+      <br>• "produção"
+    </p>
+  </div>
+
+  <div class="guideItem">
+    <span>🔐 MODE LOCK</span>
+    <p>Oculta informações sensíveis do sistema.</p>
+  </div>
+
+  <div class="guideItem">
+    <span>📡 FLUXO DO SISTEMA</span>
+    <p>
+      QR CODE → TOKEN → FACE ID → GEOLOCALIZAÇÃO → ACESSO
+    </p>
+  </div>
+
+</div>
 
 <a-scene background="color: #020202">
   <a-assets>
@@ -290,6 +515,11 @@ document.addEventListener("keydown", function(e) {
   }
 });
 
+$("#subStatusHUD").attr(
+  "value",
+  "BEM-VINDO AO VISION HUD"
+);
+
 // ================= FUNÇÕES =================
 function gerarCodigo() {
   return Math.floor(100000 + Math.random() * 900000);
@@ -467,6 +697,35 @@ function mostrarMensagem(msg) {
   }, 3000);
 }
 
+// ================= GUIA INTERATIVO =================
+
+let painelMaximizado = false;
+
+$("#minimizeGuide").click(function () {
+
+  $("#guidePanel").toggleClass("minimized");
+
+});
+
+$("#maximizeGuide").click(function () {
+
+  painelMaximizado = !painelMaximizado;
+
+  if (painelMaximizado) {
+
+    $("#guidePanel").addClass("maximized");
+
+    $("#maximizeGuide").text("❐");
+
+  } else {
+
+    $("#guidePanel").removeClass("maximized");
+
+    $("#maximizeGuide").text("□");
+  }
+
+});
+
 // ================= START IA =================
 function iniciarIA() {
 
@@ -520,6 +779,11 @@ function iniciarIA() {
     if (!resultado.isFinal) return; // 🔥 ignora parcial
 
     let texto = resultado[0].transcript;
+
+    $("#codeHUD").attr(
+  "value",
+  "VOICE INPUT: " + texto.toUpperCase()
+);
 
     responder(texto);
   };
