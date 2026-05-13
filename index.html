@@ -77,29 +77,6 @@
       opacity: 0.6;
     }
 
-  /* 🚨 BLOQUEIO PISCANDO */
-body.bloqueio a-scene {
-  animation: alertaVermelho 0.2s infinite;
-}
-
-@keyframes alertaVermelho {
-  0%   { filter: brightness(1); }
-  50%  { filter: brightness(0.3) sepia(1) hue-rotate(-50deg) saturate(8); }
-  100% { filter: brightness(1); }
-}
-
-/* HUD vermelho piscando */
-body.bloqueio #statusHUD,
-body.bloqueio #subStatusHUD {
-  color: red !important;
-  text-shadow: 0 0 10px red, 0 0 25px red;
-}
-
-@keyframes glitchRed {
-  0% { filter: hue-rotate(0deg) brightness(1); }
-  50% { filter: hue-rotate(-50deg) brightness(0.7); }
-  100% { filter: hue-rotate(0deg) brightness(1); }
-}
 
 
     @keyframes scan {
@@ -307,7 +284,7 @@ document.addEventListener("keydown", function(e) {
     $("#modeHUD").attr("value", "MODE: " + modo);
 
     $("#subStatusHUD").attr("value",
-      modo === "ON" ? "MODO NORMAL" : "ACESSO BLOQUEADO, CREDENCIAL NECESSARIA");
+      modo === "ON" ? "MODO NORMAL" : "MODO SEGURO (LOCK)");
 
     glowSuccess();
   }
@@ -408,12 +385,10 @@ function iniciarSistema() {
 
     $("#statusHUD").attr("value", "ACESSO LIBERADO");
     $("#subStatusHUD").attr("value", "IA ONLINE - AGUARDANDO COMANDO");
-
-      if (!iaAtiva) {
-        iaAtiva = true;
-        iniciarIA();
-      }
-
+    if (!iaAtiva) {
+      iaAtiva = true;
+      iniciarIA();
+    }
     glowSuccess();
 
     let video = document.querySelector("#officeVideo");
@@ -432,143 +407,68 @@ function iniciarSistema() {
 
 // ================= IA =================
 let recognition = null;
+let iaRodando = false;
 
-  
-// 🔥 PERMISSÃO DE MICROFONE
+let baseDados = {
+  "sistema|zistema|ssistema": "bateria do sistema funcionando 100%",
+  "refinaria": "Refinarias operando em 78%",
+  "exploracao": "no momento está aguardando acesso",
+  "producao": "5646 barril"
+};
 
-async function ativarMicrofone() {
-  try {
-    await navigator.mediaDevices.getUserMedia({ audio: true });
-    console.log("🎤 Permissão de microfone concedida");
-    return true;
-  } catch (e) {
-    console.log("❌ Permissão negada:", e);
-    $("#subStatusHUD").attr("value", "MIC BLOQUEADO");
-    return false;
+// ================= NORMALIZA TEXTO =================
+function limparTexto(texto) {
+  return texto
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim();
+}
+
+// ================= RESPOSTA =================
+function responder(texto) {
+
+  let textoLimpo = limparTexto(texto);
+
+  console.log("🎤 Você disse:", textoLimpo);
+
+  let encontrou = false;
+
+  for (let chave in baseDados) {
+
+    if (textoLimpo.includes(chave)) {
+
+      encontrou = true;
+
+      if (modo === "ON") {
+        mostrarMensagem(baseDados[chave]);
+      } else {
+        mostrarMensagem("████████████████████");
+      }
+
+      glowSuccess();
+      break;
+    }
+  }
+
+  if (!encontrou) {
+    console.log("❌ Não reconhecido");
   }
 }
 
-
-// 🚨 EFEITO VISUAL DE BLOQUEIO
-function ativarBloqueioVisual() {
-
-  $("body").addClass("bloqueio");
-
-  $("#statusHUD").attr("value", "⚠️ ACESSO NEGADO");
-  $("#subStatusHUD").attr("value", "DADO SENSIVEL BLOQUEADO");
-
-  glowSuccess();
+// ================= UI =================
+function mostrarMensagem(msg) {
+  $("#subStatusHUD")
+    .attr("value", msg)
+    .attr("opacity", "1");
 
   setTimeout(() => {
-    $("body").removeClass("bloqueio");
-
-    $("#statusHUD").attr("value", "ACESSO LIBERADO");
-    $("#subStatusHUD").attr("value", "IA ONLINE - AGUARDANDO COMANDO");
-
-  }, 2000); // ⏱️ 2 segundos
+    $("#subStatusHUD").attr("value", "");
+  }, 3000);
 }
 
-
-let iaRodando = false;
-let podeReiniciar = true;
-
-
-//=============== CEREBRO DA IA (OTIMIZADO PARA VISOR) ===================
-let baseDados = {
-  // --- MONITORAMENTO GERAL ---
-  "sistema|systema|cistema|zistema": "Bateria do sistema em 100%. Protocolos de seguranca ativos.",
-  "refinaria|refino": "Refinarias operando em 78% da capacidade nominal. Sem gargalos detectados.",
-  "exploracao|perfuracao": "Sonda de perfuracao em modo de espera; aguardando liberacao de acesso ao poco.",
-  "producao|vazao|fluxo": "Producao atual: 5.646 barris/dia. Estabilidade de fluxo confirmada.",
-  "unidade|plataforma|fpso": "Unidade operando dentro dos limites de inclinacao e estabilidade.",
-  
-  // --- SEGURANCA E AMBIENTE (HSE) ---
-  "seguranca|epi|epc": "Verifique o uso de capacete, luvas de impacto e detector de H2S antes de entrar na area.",
-  "vazamento|contencao|derramamento": "Nenhum alerta de vazamento nas ultimas 24 horas. Sensores de pressao estaveis.",
-  "incendio|fogo|brigada": "Sistema fixo de combate a incendio em prontidao. Saidas de emergencia desobstruidas.",
-  "pressao|manometro|psi": "Pressao do cabecote do poco operando dentro da margem de 1500 a 2000 psi.",
-  "gas|h2s|metano": "Detectores de gas ativos. Concentracao de gases inflamaveis em 0%.",
-
-  // --- EQUIPAMENTOS E MANUTENCAO ---
-  "bomba|motobomba|compressor": "Compressor de gas 02 com manutencao preventiva agendada para 48 horas.",
-  "valvula|anular|gaveta|dhsv": "Valvula de seguranca de fundo (DHSV) testada e operacional.",
-  "turbina|gerador|energia": "Gerador de energia operando em carga media. Consumo de diesel regular.",
-  "instrumentacao|calibracao": "Sensores de nivel calibrados na ultima parada de manutencao.",
-  "lubrificacao|oleo|graxa": "Niveis de lubrificante dos motores verificados e conformes.",
-
-  // --- LOGISTICA E FLUIDOS ---
-  "lama|fluido|viscosidade": "Viscosidade do fluido de perfuracao dentro dos parametros de projeto (50-60 marsh).",
-  "estoque|tanque|armazenamento": "Tanque de armazenamento T-402 em 65% da capacidade total.",
-  "logistica|transporte|offshore": "Previsao de chegada da embarcacao de suprimentos: 14:00h.",
-  "carga|suprimento|diesel": "Estoque de combustivel suficiente para 15 dias de operacao plena.",
-
-  // --- EQUIPAMENTOS DE FLUXO E CONTROLE ---
-  "tubo|linha|duto|tubulacao": "Integridade da linha confirmada. Sem sinais de corrosao externa.",
-  "filtro|peneira": "Diferencial de pressao no filtro esta normal. Sem necessidade de troca.",
-  "selo|gaxeta|vedacao": "Selo mecanico operando sem gotejamento. Temperatura estavel.",
-  "flange|junta|torque": "Torque verificado conforme norma. Sem perda de estanqueidade.",
-  
-  // --- MOTORES E ELETRICA ---
-  "motor|arranque|rotacao": "Motor principal com vibracao em 2.5 mm/s. Dentro da zona verde.",
-  "painel|disjuntor|tensao": "Painel eletrico refrigerado e sem alarmes de sobrecarga.",
-  "cabo|fiacao|isolamento": "Isolamento testado. Resistencia dentro dos padroes de seguranca.",
-  "bateria|nobreak|ups": "Autonomia de bateria em 4 horas para sistemas criticos.",
-
-  // --- FERRAMENTAS E SENSORES ---
-  "camera|termica|calor": "Anomalias termicas detectadas no flange primario. Favor inspecionar.",
-  "medidor|sensor|radar": "Sensor de nivel ultrassonico ativo. Margem de erro de 0.1%.",
-  "chave|ferramenta": "Torquimetro calibrado e disponivel na bancada de ferramentas.",
-  "radio|comunicacao|sinal": "Sinal de radio forte em todas as areas da unidade.",
-
-  // --- ESTRUTURA E ACESSO ---
-  "andaime|escada|passarela": "Estrutura de acesso inspecionada e liberada para uso (etiqueta verde).",
-  "guindaste|guincho|içamento": "Capacidade de carga limitada a 50 toneladas devido ao vento atual.",
-  "elevador|montacarga": "Elevador de servico em manutencao preventiva ate as 15:00h.",
-  "vaso|separador|vasodepressao": "Vaso de pressao operando em regime de 45 graus Celsius.",
-
-  // --- EMERGENCIA E COMANDOS RAPIDOS ---
-  "status|geral|resumo": "Todos os sistemas criticos operando em redundancia.",
-  "alerta|erro|falha": "Nenhum erro critico pendente no log do sistema.",
-  "ajuda|suporte|manual": "Protocolo de suporte ativo. Diga o nome do equipamento para detalhes.",
-  "parada|stop|desligar": "Sequencia de desligamento de emergencia (ESD) pronta para acionamento.",
-  "clima|tempo|vento": "Condicoes climaticas favoraveis para operacoes de deck.",
-  "murilo": "ele gosta de rebolar lentinho pros cria",
-  "cabelinho": "precisa de testosterona da fonte",
-
-};
-
-// 🚨 DADOS SENSÍVEIS (BLACKLIST EXPANDIDA E SEM ACENTOS)
-
-let dadosSensiveis = [
-  // --- IDENTIFICACAO PESSOAL ---
-  "cpf", "rg", "passaporte", "cnh", "biometria", "digital", "nascimento", "endereco", "sobrenome",
-
-  // --- AUTENTICACAO E ACESSO ---
-  "senha", "password", "pin", "token", "codigo", "acesso", "credencial", "login", 
-  "chave", "key", "secret", "privada", "ssh", "api", "autenticacao", "mfa", "2fa", "admin", "root",
-
-  // --- FINANCEIRO E PAGAMENTOS ---
-  "cartao", "numero do cartao", "cvv", "validade", "banco", "pix", "agencia", "conta",
-  "fatura", "pagamento", "salario", "custo", "valor", "orcamento", "financeiro", "preco",
-
-  // --- COMANDOS DE EXTRACAO ---
-  "print", "foto", "enviar", "exportar", "download", "baixar", "copiar", "printscreen",
-  "gravar","grava","grava", "audio", "video", "anexo", "upload", "compartilhar", "link", "transmitir", "backup",
-
-  // --- SEGREDOS INDUSTRIAIS ---
-  "coordenada", "latitude", "longitude", "gps", "mapa", "planta", "projeto", "estrategia",
-  "vulnerabilidade", "falha", "brecha", "exploit", "bug", "defeito", "fraqueza",
-  "quimica", "formula", "composicao", "mistura", "patente", "geologia", "reservatorio",
-
-  // --- INFRAESTRUTURA DE TI ---
-  "ip", "servidor", "host", "database", "banco de dados", "sql", "firewall", "porta", 
-  "vpn", "proxy", "endpoint", "dns", "gateway", "mac address"
-];
-//================================================================
-
+// ================= START IA =================
 function iniciarIA() {
-
-  if (iaRodando) return;
 
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
@@ -580,12 +480,12 @@ function iniciarIA() {
   recognition = new SpeechRecognition();
 
   recognition.lang = "pt-BR";
-  recognition.continuous = true; 
-  recognition.interimResults = false;
+  recognition.continuous = true;
+  recognition.interimResults = true; // 🔥 melhora MUITO detecção
 
   recognition.onstart = function () {
     iaRodando = true;
-    console.log("🎤 IA iniciou");
+    console.log("✅ IA ouvindo...");
   };
 
   recognition.onend = function () {
@@ -593,88 +493,43 @@ function iniciarIA() {
 
     if (!iaAtiva) return;
 
-    if (!podeReiniciar) return;
-
-    podeReiniciar = false;
+    console.log("🔁 Reiniciando IA...");
 
     setTimeout(() => {
       try {
         recognition.start();
       } catch (e) {
-        console.log("Erro ao reiniciar:", e);
+        console.log("Erro restart:", e);
       }
-
-      setTimeout(() => {
-        podeReiniciar = true;
-      }, 1000);
-
-    }, 2500); // tempo maior = estabilidade total
+    }, 800);
   };
 
   recognition.onerror = function (event) {
-
-    console.log("Erro:", event.error);
+    console.log("⚠️ Erro:", event.error);
 
     if (event.error === "not-allowed") {
-      $("#subStatusHUD").attr("value", "MICROFONE BLOQUEADO");
+      $("#subStatusHUD").attr("value", "MIC BLOQUEADO");
       iaAtiva = false;
-    }
-
-    if (
-      event.error === "aborted" ||
-      event.error === "network" ||
-      event.error === "service-not-allowed"
-    ) {
-      return;
     }
   };
 
-recognition.onresult = function (event) {
+  recognition.onresult = function (event) {
 
-  let texto = event.results[event.results.length - 1][0].transcript
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "");
+    let resultado = event.results[event.results.length - 1];
 
-  console.log("Você disse:", texto);
+    if (!resultado.isFinal) return; // 🔥 ignora parcial
 
-  // 🚨 VERIFICA DADOS SENSÍVEIS
-for (let dado of dadosSensiveis) {
-  if (texto.includes(dado)) {
-    ativarBloqueioVisual();
-    return;
-  }
-}
+    let texto = resultado[0].transcript;
 
-  for (let palavra in baseDados) {
-
-    let alternativas = palavra.split("|");
-
-    for (let alt of alternativas) {
-
-      if (texto.includes(alt)) {
-
-        if (modo === "ON") {
-          $("#subStatusHUD").attr("value", baseDados[palavra]);
-        } else {
-          $("#subStatusHUD").attr("value", "INFORMACAO SENSIVEL DA IA BLOQUEADA");
-        }
-
-        glowSuccess();
-        return;
-      }
-    }
-  }
-};
+    responder(texto);
+  };
 
   try {
     recognition.start();
   } catch (e) {
-    console.log("Erro ao iniciar:", e);
+    console.log("Erro iniciar:", e);
   }
 }
-
-
 // ================= START =================
 $(document).ready(function(){
   setTimeout(iniciarSistema, 2000);
@@ -682,12 +537,7 @@ $(document).ready(function(){
 
 let iaIniciada = false;
 
-$(document).one("click", async function(){
-
-  let permitido = await ativarMicrofone();
-
-  if (!permitido) return;
-
+$(document).one("click", function(){
   if (!iaIniciada) {
     iaAtiva = true;
     iniciarIA();
